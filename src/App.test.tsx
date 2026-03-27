@@ -13,7 +13,7 @@ describe('CheckBefore app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: 'Add item' }))
+    await user.click(await screen.findByRole('button', { name: 'Add item' }))
     await user.type(screen.getByLabelText('Item text'), 'Wallet')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -41,7 +41,7 @@ describe('CheckBefore app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: 'Add item' }))
+    await user.click(await screen.findByRole('button', { name: 'Add item' }))
     await user.type(screen.getByLabelText('Item text'), 'Phone')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await user.click(screen.getByLabelText('Toggle Phone'))
@@ -85,8 +85,8 @@ describe('CheckBefore app', () => {
     expect(await screen.findByRole('heading', { name: 'Lista de hoy' })).toBeInTheDocument()
     expect(screen.getByText('Pasaporte')).toBeInTheDocument()
 
-    await userEvent.setup().click(screen.getByLabelText('Configuración'))
-    expect(screen.getByLabelText('Idioma')).toHaveTextContent('Español')
+    await userEvent.setup().click(await screen.findByLabelText('Configuración'))
+    expect(await screen.findByLabelText('Idioma')).toHaveTextContent('Español')
     expect(screen.getByLabelText('Tema')).toHaveTextContent('Oscuro')
   })
 
@@ -94,9 +94,9 @@ describe('CheckBefore app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByLabelText('Settings'))
+    await user.click(await screen.findByLabelText('Settings'))
 
-    const [languageSelect, themeSelect] = screen.getAllByRole('combobox')
+    const [languageSelect, themeSelect] = await screen.findAllByRole('combobox')
 
     fireEvent.mouseDown(languageSelect)
     const languageListbox = await screen.findByRole('listbox')

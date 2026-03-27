@@ -1,15 +1,39 @@
-import { CssBaseline, ThemeProvider, useMediaQuery } from '@mui/material'
-import { useMemo } from 'react'
+import { Box, CircularProgress, CssBaseline, ThemeProvider, useMediaQuery } from '@mui/material'
+import { Suspense, lazy, useMemo } from 'react'
 import { IntlProvider } from 'react-intl'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppStateProvider, useAppState } from './context/AppStateContext'
 import { AppLayout } from './layout/AppLayout'
 import { getMessages } from './messages'
-import { ChecklistPage } from './pages/ChecklistPage'
-import { LegalPage } from './pages/LegalPage'
-import { ReorderPage } from './pages/ReorderPage'
-import { SettingsPage } from './pages/SettingsPage'
 import { createAppTheme } from './theme/theme'
+
+const ChecklistPage = lazy(async () => {
+  const module = await import('./pages/ChecklistPage')
+  return { default: module.ChecklistPage }
+})
+
+const SettingsPage = lazy(async () => {
+  const module = await import('./pages/SettingsPage')
+  return { default: module.SettingsPage }
+})
+
+const ReorderPage = lazy(async () => {
+  const module = await import('./pages/ReorderPage')
+  return { default: module.ReorderPage }
+})
+
+const LegalPage = lazy(async () => {
+  const module = await import('./pages/LegalPage')
+  return { default: module.LegalPage }
+})
+
+function RouteLoadingFallback() {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+      <CircularProgress />
+    </Box>
+  )
+}
 
 function AppContent() {
   const { settings } = useAppState()
@@ -30,16 +54,18 @@ function AppContent() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <HashRouter>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route index element={<ChecklistPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="reorder" element={<ReorderPage />} />
-              <Route path="terms" element={<LegalPage kind="terms" />} />
-              <Route path="privacy" element={<LegalPage kind="privacy" />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route index element={<ChecklistPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="reorder" element={<ReorderPage />} />
+                <Route path="terms" element={<LegalPage kind="terms" />} />
+                <Route path="privacy" element={<LegalPage kind="privacy" />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </Suspense>
         </HashRouter>
       </ThemeProvider>
     </IntlProvider>
