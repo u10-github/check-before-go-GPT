@@ -1,27 +1,82 @@
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import FormatListNumberedRoundedIcon from '@mui/icons-material/FormatListNumberedRounded'
 import GavelRoundedIcon from '@mui/icons-material/GavelRounded'
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded'
 import PrivacyTipRoundedIcon from '@mui/icons-material/PrivacyTipRounded'
 import {
+  Alert,
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   MenuItem,
   Stack,
   TextField,
   Typography,
 } from '@mui/material'
+import { useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { Link as RouterLink } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { useAppState } from '../context/AppStateContext'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import { parsePersistedState, serializePersistedState } from '../lib/storage'
+import type { PersistedState } from '../types'
 import type { Language, ThemeMode } from '../types'
 
 export function SettingsPage() {
   const intl = useIntl()
-  const { settings, setLanguage, setThemeMode } = useAppState()
+  const { items, settings, replaceState, setLanguage, setThemeMode } = useAppState()
   const { canInstall, promptInstall } = useInstallPrompt()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [importState, setImportState] = useState<PersistedState | null>(null)
+  const [importFileName, setImportFileName] = useState<string | null>(null)
+  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'success' | 'error'>('idle')
+
+  const exportState = () => {
+    const state: PersistedState = {
+      version: 1,
+      items,
+      settings,
+    }
+    const blob = new Blob([serializePersistedState(state)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const date = new Date().toISOString().slice(0, 10)
+
+    link.href = url
+    link.download = `checkbefore-backup-${date}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    const content = await file.text()
+    const parsed = parsePersistedState(content)
+
+    if (parsed.status === 'error') {
+      setImportState(null)
+      setImportFileName(null)
+      setRestoreStatus('error')
+      event.target.value = ''
+      return
+    }
+
+    setImportState(parsed.state)
+    setImportFileName(file.name)
+    setRestoreStatus('idle')
+    event.target.value = ''
+  }
 
   return (
     <Stack spacing={3}>
@@ -56,6 +111,51 @@ export function SettingsPage() {
               <MenuItem value="light">{intl.formatMessage({ id: 'theme.light' })}</MenuItem>
               <MenuItem value="dark">{intl.formatMessage({ id: 'theme.dark' })}</MenuItem>
             </TextField>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="h6" fontWeight={700}>
+              <FormattedMessage id="settings.backupTitle" />
+            </Typography>
+            <Typography color="text.secondary">
+              <FormattedMessage id="settings.backupDescription" />
+            </Typography>
+            {restoreStatus === 'success' ? (
+              <Alert severity="success">
+                <FormattedMessage id="settings.restoreSuccess" />
+              </Alert>
+            ) : null}
+            {restoreStatus === 'error' ? (
+              <Alert severity="error">
+                <FormattedMessage id="settings.restoreError" />
+              </Alert>
+            ) : null}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={exportState}>
+                <FormattedMessage id="settings.backupButton" />
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <FormattedMessage id="settings.restoreButton" />
+              </Button>
+            </Stack>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              hidden
+              aria-label={intl.formatMessage({ id: 'settings.restoreInput' })}
+              onChange={(event) => {
+                void handleImportChange(event)
+              }}
+            />
           </Stack>
         </CardContent>
       </Card>
@@ -133,6 +233,43 @@ export function SettingsPage() {
           </Stack>
         </CardContent>
       </Card>
+
+      <Dialog open={importState !== null} onClose={() => setImportState(null)}>
+        <DialogTitle>
+          <FormattedMessage id="settings.restoreConfirmTitle" />
+        </DialogTitle>
+        <DialogContent>
+          <FormattedMessage
+            id="settings.restoreConfirmDescription"
+            values={{ fileName: importFileName ?? intl.formatMessage({ id: 'app.title' }) }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={() => {
+              setImportState(null)
+              setImportFileName(null)
+            }}
+          >
+            <FormattedMessage id="common.cancel" />
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (!importState) {
+                return
+              }
+
+              replaceState(importState)
+              setImportState(null)
+              setImportFileName(null)
+              setRestoreStatus('success')
+            }}
+          >
+            <FormattedMessage id="settings.restoreConfirmButton" />
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   )
 }

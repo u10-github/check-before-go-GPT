@@ -32,6 +32,9 @@ Build a mobile-first web app called **CheckBefore**. The app acts as a single-li
 - Settings screen must support language selection.
 - Settings screen must support theme selection: `system`, `light`, `dark`.
 - Settings screen must include a PWA install entry when available.
+- Settings screen must allow exporting the current checklist and settings as a JSON backup.
+- Settings screen must allow restoring a previously exported JSON backup after explicit confirmation.
+- Invalid backup files must be rejected without mutating the current state.
 
 ### Pages
 
@@ -83,6 +86,7 @@ Build a mobile-first web app called **CheckBefore**. The app acts as a single-li
 - A user can manage a single checklist end-to-end in the browser.
 - The checked state survives reloads.
 - Language and theme settings survive reloads.
+- A user can export and restore the full local state without a backend.
 - Reordering is available only through the settings flow.
 - Reset requires confirmation.
 - Terms and privacy pages are reachable.

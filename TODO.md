@@ -15,7 +15,7 @@
 
 ## In Progress
 
-- [ ] Add backup / restore for the local-only checklist state from the Settings screen.
+- [ ] No active implementation tasks.
 
 ## Completed
 
@@ -32,6 +32,7 @@
 - [x] Split route pages with `React.lazy` / `Suspense` to remove the Vite chunk size warning from the main bundle.
 - [x] Switched GitHub Pages from legacy branch publishing to workflow publishing and verified the live site serves built assets from `/check-before-go-GPT/assets/`.
 - [x] Stabilized `src/App.test.tsx` by splitting the slow CRUD integration test into smaller responsibilities after it hit the 5-second Vitest timeout.
+- [x] Added JSON backup / restore for the local-only checklist state from the Settings screen, including validation, confirmation, and tests.
 
 ## Work Log
 
@@ -45,3 +46,4 @@
 - Diagnosed the first remote Pages failure: `actions/configure-pages@v5` failed because Pages had stayed on `main` / `/` (`build_type: legacy`) instead of GitHub Actions.
 - Switched the repository Pages build type to `workflow`, pushed the latest commits, and verified a successful `Deploy to GitHub Pages` run plus live HTML that references `/check-before-go-GPT/assets/...`.
 - Selected backup / restore as the next likely feature candidate, then fixed a newly surfaced Vitest timeout in `src/App.test.tsx` by splitting the slow CRUD flow into smaller tests before moving on.
+- Added export / import controls to the settings screen, validated backup files through `src/lib/storage.ts`, and covered restore success, cancel, and invalid-file behavior with automated tests.

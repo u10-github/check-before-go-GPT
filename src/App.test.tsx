@@ -9,6 +9,10 @@ async function addItem(user: ReturnType<typeof userEvent.setup>, text: string) {
   await user.click(screen.getByRole('button', { name: 'Save' }))
 }
 
+function createBackupFile(state: unknown, name = 'backup.json') {
+  return new File([JSON.stringify(state)], name, { type: 'application/json' })
+}
+
 describe('CheckBefore app', () => {
   beforeEach(() => {
     window.localStorage.clear()
@@ -143,5 +147,119 @@ describe('CheckBefore app', () => {
     })
 
     expect(screen.getByRole('heading', { name: '設定' })).toBeInTheDocument()
+  })
+
+  it('restores a backup after confirmation', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        items: [],
+        settings: {
+          language: 'en',
+          themeMode: 'system',
+        },
+      }),
+    )
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByLabelText('Settings'))
+    await user.upload(
+      screen.getByLabelText('Select backup file'),
+      createBackupFile({
+        version: 1,
+        items: [
+          {
+            id: 'wallet',
+            text: 'Wallet',
+            checked: true,
+            order: 0,
+            createdAt: '2026-03-27T00:00:00.000Z',
+            updatedAt: '2026-03-27T00:00:00.000Z',
+          },
+        ],
+        settings: {
+          language: 'ja',
+          themeMode: 'dark',
+        },
+      }),
+    )
+
+    expect(await screen.findByText('Importing backup.json will replace your current checklist and settings.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Restore now' }))
+
+    await waitFor(() => {
+      const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+      expect(persisted.settings.language).toBe('ja')
+      expect(persisted.settings.themeMode).toBe('dark')
+      expect(persisted.items[0].text).toBe('Wallet')
+    })
+
+    expect(await screen.findByText('バックアップを復元しました。')).toBeInTheDocument()
+  })
+
+  it('keeps the current state when backup restore is canceled', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'keys',
+            text: 'Keys',
+            checked: false,
+            order: 0,
+            createdAt: '2026-03-27T00:00:00.000Z',
+            updatedAt: '2026-03-27T00:00:00.000Z',
+          },
+        ],
+        settings: {
+          language: 'en',
+          themeMode: 'system',
+        },
+      }),
+    )
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByLabelText('Settings'))
+    await user.upload(
+      screen.getByLabelText('Select backup file'),
+      createBackupFile({
+        version: 1,
+        items: [],
+        settings: {
+          language: 'ja',
+          themeMode: 'dark',
+        },
+      }, 'replacement.json'),
+    )
+
+    expect(await screen.findByText('Importing replacement.json will replace your current checklist and settings.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(persisted.settings.language).toBe('en')
+    expect(persisted.items[0].text).toBe('Keys')
+  })
+
+  it('rejects invalid backup files without replacing state', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByLabelText('Settings'))
+    await user.upload(
+      screen.getByLabelText('Select backup file'),
+      new File(['{"version":1,"items":[],"settings":{"language":"fr","themeMode":"dark"}}'], 'invalid.json', {
+        type: 'application/json',
+      }),
+    )
+
+    expect(await screen.findByText('The selected file is not a valid CheckBefore backup.')).toBeInTheDocument()
+    const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(persisted.settings.language).not.toBe('fr')
   })
 })

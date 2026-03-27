@@ -14,6 +14,7 @@ interface AppStateContextValue {
   moveItem: (id: string, direction: 'up' | 'down') => void
   setLanguage: (language: Language) => void
   setThemeMode: (themeMode: ThemeMode) => void
+  replaceState: (state: PersistedState) => void
 }
 
 const AppStateContext = createContext<AppStateContextValue | undefined>(undefined)
@@ -140,6 +141,10 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     }))
   }, [])
 
+  const replaceState = useCallback((state: PersistedState) => {
+    setState(state)
+  }, [])
+
   const value = useMemo(
     () => ({
       items: [...items].sort((left, right) => left.order - right.order),
@@ -152,12 +157,14 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       moveItem,
       setLanguage,
       setThemeMode,
+      replaceState,
     }),
     [
       addItem,
       deleteItem,
       items,
       moveItem,
+      replaceState,
       resetChecks,
       setLanguage,
       setThemeMode,

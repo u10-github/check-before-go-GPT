@@ -4,7 +4,7 @@
 
 - `src/App.tsx` - app composition and route tree
 - `src/context/AppStateContext.tsx` - checklist and settings state management
-- `src/lib/storage.ts` - versioned local storage helpers
+- `src/lib/storage.ts` - versioned local storage helpers plus backup parse/serialize helpers
 - `src/messages.ts` - message dictionaries and locale helpers
 - `src/theme/theme.ts` - MUI theme generation
 - `src/pages/` - route-level pages
@@ -24,7 +24,7 @@
 ## State management
 
 - `AppStateContext` owns checklist items and user settings.
-- Mutations are exposed as typed callbacks for add, edit, delete, toggle, reset, reorder, language change, and theme change.
+- Mutations are exposed as typed callbacks for add, edit, delete, toggle, reset, reorder, language change, theme change, and full-state replacement during backup restore.
 - Route pages consume the context through `useAppState()`.
 
 ## Persistence strategy
@@ -32,6 +32,7 @@
 - Persist a single object under one local storage key.
 - Normalize invalid or missing data back to safe defaults.
 - Reindex item order whenever deletion or reordering changes the list.
+- Backup restore goes through the same storage validation layer before replacing the in-memory state.
 
 ## i18n strategy
 
@@ -50,3 +51,9 @@
 - `vite-plugin-pwa` handles manifest and service worker generation.
 - The app shell and static assets are precached.
 - The settings screen exposes install capability through `beforeinstallprompt` when the browser supports it.
+
+## Backup / restore strategy
+
+- The settings screen can export the current persisted state as formatted JSON.
+- Restore reads a user-selected JSON file, validates its structure in `src/lib/storage.ts`, then asks for confirmation before replacing the active state.
+- Invalid backup content surfaces an error in the UI and leaves the current state untouched.

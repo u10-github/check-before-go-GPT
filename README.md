@@ -6,6 +6,7 @@ CheckBefore is a mobile-first forgetting prevention checklist app. It is built a
 
 - Single fixed checklist with add, edit, delete, toggle, and reorder flows
 - Persistent state via `localStorage`
+- Backup export and restore from the settings screen
 - Reset-all action with confirmation dialog
 - Settings page for language, theme, and install guidance
 - English, Español, 日本語 UI
@@ -63,6 +64,8 @@ The app stores a single versioned state object in `localStorage`.
 - `items`: checklist rows with `id`, `text`, `checked`, `order`, `createdAt`, `updatedAt`
 - `settings.language`: `en`, `es`, or `ja`
 - `settings.themeMode`: `system`, `light`, or `dark`
+
+You can also export the current state as a JSON backup and later restore it from the settings screen.
 
 ## Deployment
 
