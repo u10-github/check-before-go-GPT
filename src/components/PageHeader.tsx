@@ -1,17 +1,25 @@
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import { IconButton, Stack, Typography } from '@mui/material'
+import type { TypographyProps } from '@mui/material'
 import { useIntl } from 'react-intl'
 import { useNavigate } from 'react-router-dom'
 
 interface PageHeaderProps {
   title: string
-  description: string
+  description?: string
+  titleVariant?: TypographyProps['variant']
   showBack?: boolean
   showSettings?: boolean
 }
 
-export function PageHeader({ title, description, showBack = false, showSettings = false }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  titleVariant = 'h4',
+  showBack = false,
+  showSettings = false,
+}: PageHeaderProps) {
   const intl = useIntl()
   const navigate = useNavigate()
 
@@ -29,11 +37,11 @@ export function PageHeader({ title, description, showBack = false, showSettings 
               <ArrowBackRoundedIcon />
             </IconButton>
           ) : null}
-          <Typography component="h1" variant="h4" fontWeight={700}>
+          <Typography component="h1" variant={titleVariant} fontWeight={700}>
             {title}
           </Typography>
         </Stack>
-        <Typography color="text.secondary">{description}</Typography>
+        {description ? <Typography color="text.secondary">{description}</Typography> : null}
       </Stack>
       {showSettings ? (
         <IconButton

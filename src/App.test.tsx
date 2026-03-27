@@ -59,7 +59,8 @@ describe('CheckBefore app', () => {
 
     expect(await screen.findByText('Wallet')).toBeInTheDocument()
 
-    await user.click(screen.getByLabelText('Edit Wallet'))
+    await user.click(screen.getByLabelText('Open actions for Wallet'))
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
     const input = screen.getByLabelText('Item text')
     await user.clear(input)
     await user.type(input, 'Wallet and keys')
@@ -67,7 +68,8 @@ describe('CheckBefore app', () => {
 
     expect(await screen.findByText('Wallet and keys')).toBeInTheDocument()
 
-    await user.click(screen.getByLabelText('Delete Wallet and keys'))
+    await user.click(screen.getByLabelText('Open actions for Wallet and keys'))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     await waitFor(() => {
       expect(screen.queryByText('Wallet and keys')).not.toBeInTheDocument()
     })
