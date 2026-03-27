@@ -65,6 +65,8 @@ export function ChecklistPage() {
             <Stack key={item.id} direction="row" spacing={1} alignItems="stretch">
               <ButtonBase
                 onClick={() => toggleItem(item.id)}
+                role="checkbox"
+                aria-checked={item.checked}
                 aria-label={intl.formatMessage({ id: 'checklist.toggleAria' }, { item: item.text })}
                 sx={{
                   flex: 1,

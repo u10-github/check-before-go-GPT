@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
 import App from './App'
 import { STORAGE_KEY } from './lib/storage'
 
@@ -19,16 +20,23 @@ describe('CheckBefore app', () => {
     window.location.hash = ''
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('adds and toggles items', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     await addItem(user, 'Wallet')
 
-    const item = await screen.findByText('Wallet')
-    expect(item).toBeInTheDocument()
+    expect(await screen.findByText('Wallet')).toBeInTheDocument()
 
-    await user.click(screen.getByLabelText('Toggle Wallet'))
+    const toggle = screen.getByRole('checkbox', { name: 'Toggle Wallet' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(toggle)
+    expect(screen.getByRole('checkbox', { name: 'Toggle Wallet' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText('Checked')).toBeInTheDocument()
   })
 
@@ -200,6 +208,69 @@ describe('CheckBefore app', () => {
     })
 
     expect(await screen.findByText('バックアップを復元しました。')).toBeInTheDocument()
+  })
+
+  it('exports the current checklist state as a backup file', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'wallet',
+            text: 'Wallet',
+            checked: true,
+            order: 0,
+            createdAt: '2026-03-27T00:00:00.000Z',
+            updatedAt: '2026-03-27T00:00:00.000Z',
+          },
+        ],
+        settings: {
+          language: 'en',
+          themeMode: 'dark',
+        },
+      }),
+    )
+
+    const user = userEvent.setup()
+    const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup')
+    const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const originalCreateElement = document.createElement.bind(document)
+    const anchorClick = vi.fn()
+    let downloadName = ''
+
+    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      if (tagName === 'a') {
+        const anchor = originalCreateElement('a')
+        anchor.click = anchorClick
+        Object.defineProperty(anchor, 'download', {
+          configurable: true,
+          get: () => downloadName,
+          set: (value: string) => {
+            downloadName = value
+          },
+        })
+        return anchor
+      }
+
+      return originalCreateElement(tagName)
+    }) as typeof document.createElement)
+
+    render(<App />)
+
+    await user.click(await screen.findByLabelText('Settings'))
+    await user.click(await screen.findByRole('button', { name: 'Download backup' }))
+
+    expect(createObjectURLSpy).toHaveBeenCalledTimes(1)
+    expect(anchorClick).toHaveBeenCalledTimes(1)
+    expect(downloadName).toMatch(/^checkbefore-backup-\d{4}-\d{2}-\d{2}\.json$/)
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:backup')
+
+    const exportedBlob = createObjectURLSpy.mock.calls[0][0] as Blob
+    const exportedState = JSON.parse(await exportedBlob.text())
+    expect(exportedState.settings.themeMode).toBe('dark')
+    expect(exportedState.items[0].text).toBe('Wallet')
+    expect(exportedState.items[0].checked).toBe(true)
   })
 
   it('keeps the current state when backup restore is canceled', async () => {
