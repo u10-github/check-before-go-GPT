@@ -1,0 +1,22 @@
+export type Language = 'en' | 'es' | 'ja'
+export type ThemeMode = 'system' | 'light' | 'dark'
+
+export interface ChecklistItem {
+  id: string
+  text: string
+  checked: boolean
+  order: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AppSettings {
+  language: Language
+  themeMode: ThemeMode
+}
+
+export interface PersistedState {
+  version: 1
+  items: ChecklistItem[]
+  settings: AppSettings
+}
