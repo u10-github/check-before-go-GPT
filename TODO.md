@@ -15,7 +15,7 @@
 
 ## In Progress
 
-- [ ] No active implementation tasks.
+- [ ] Add backup / restore for the local-only checklist state from the Settings screen.
 
 ## Completed
 
@@ -31,6 +31,7 @@
 - [x] Verified `npm run lint`, `npm run test`, and `npm run build`.
 - [x] Split route pages with `React.lazy` / `Suspense` to remove the Vite chunk size warning from the main bundle.
 - [x] Switched GitHub Pages from legacy branch publishing to workflow publishing and verified the live site serves built assets from `/check-before-go-GPT/assets/`.
+- [x] Stabilized `src/App.test.tsx` by splitting the slow CRUD integration test into smaller responsibilities after it hit the 5-second Vitest timeout.
 
 ## Work Log
 
@@ -43,3 +44,4 @@
 - Replaced eager route imports with route-level lazy loading after the production build warned about a 556.55 kB main chunk; the largest post-change entry chunk is now 398.60 kB and the warning is gone.
 - Diagnosed the first remote Pages failure: `actions/configure-pages@v5` failed because Pages had stayed on `main` / `/` (`build_type: legacy`) instead of GitHub Actions.
 - Switched the repository Pages build type to `workflow`, pushed the latest commits, and verified a successful `Deploy to GitHub Pages` run plus live HTML that references `/check-before-go-GPT/assets/...`.
+- Selected backup / restore as the next likely feature candidate, then fixed a newly surfaced Vitest timeout in `src/App.test.tsx` by splitting the slow CRUD flow into smaller tests before moving on.

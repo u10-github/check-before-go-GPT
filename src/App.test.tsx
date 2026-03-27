@@ -3,25 +3,57 @@ import userEvent from '@testing-library/user-event'
 import App from './App'
 import { STORAGE_KEY } from './lib/storage'
 
+async function addItem(user: ReturnType<typeof userEvent.setup>, text: string) {
+  await user.click(await screen.findByRole('button', { name: 'Add item' }))
+  await user.type(screen.getByLabelText('Item text'), text)
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+}
+
 describe('CheckBefore app', () => {
   beforeEach(() => {
     window.localStorage.clear()
     window.location.hash = ''
   })
 
-  it('adds, toggles, edits, and deletes items', async () => {
+  it('adds and toggles items', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: 'Add item' }))
-    await user.type(screen.getByLabelText('Item text'), 'Wallet')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await addItem(user, 'Wallet')
 
     const item = await screen.findByText('Wallet')
     expect(item).toBeInTheDocument()
 
     await user.click(screen.getByLabelText('Toggle Wallet'))
     expect(screen.getByText('Checked')).toBeInTheDocument()
+  })
+
+  it('edits and deletes existing items', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'wallet',
+            text: 'Wallet',
+            checked: false,
+            order: 0,
+            createdAt: '2026-03-27T00:00:00.000Z',
+            updatedAt: '2026-03-27T00:00:00.000Z',
+          },
+        ],
+        settings: {
+          language: 'en',
+          themeMode: 'system',
+        },
+      }),
+    )
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('Wallet')).toBeInTheDocument()
 
     await user.click(screen.getByLabelText('Edit Wallet'))
     const input = screen.getByLabelText('Item text')
@@ -41,9 +73,7 @@ describe('CheckBefore app', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: 'Add item' }))
-    await user.type(screen.getByLabelText('Item text'), 'Phone')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await addItem(user, 'Phone')
     await user.click(screen.getByLabelText('Toggle Phone'))
 
     await user.click(screen.getByRole('button', { name: 'Reset all' }))
