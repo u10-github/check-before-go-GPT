@@ -19,7 +19,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { ChecklistItemDialog } from '../components/ChecklistItemDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -27,19 +27,85 @@ import { PageHeader } from '../components/PageHeader'
 import { useAppState } from '../context/AppStateContext'
 import type { ChecklistItem } from '../types'
 
+type RelativeResetCopy =
+  | { id: 'checklist.lastResetJustNow' }
+  | { id: 'checklist.lastResetMinutesAgo' | 'checklist.lastResetHoursAgo' | 'checklist.lastResetDaysAgo'; count: number }
+
+function getRelativeResetCopy(lastResetAt: string, nowTimestamp: number): RelativeResetCopy | null {
+  const resetTimestamp = new Date(lastResetAt).getTime()
+
+  if (Number.isNaN(resetTimestamp)) {
+    return null
+  }
+
+  const elapsedMs = Math.max(0, nowTimestamp - resetTimestamp)
+
+  if (elapsedMs < 60_000) {
+    return { id: 'checklist.lastResetJustNow' }
+  }
+
+  const elapsedMinutes = Math.floor(elapsedMs / 60_000)
+
+  if (elapsedMinutes < 60) {
+    return { id: 'checklist.lastResetMinutesAgo', count: elapsedMinutes }
+  }
+
+  const elapsedHours = Math.floor(elapsedMs / 3_600_000)
+
+  if (elapsedHours < 24) {
+    return { id: 'checklist.lastResetHoursAgo', count: elapsedHours }
+  }
+
+  return {
+    id: 'checklist.lastResetDaysAgo',
+    count: Math.floor(elapsedMs / 86_400_000),
+  }
+}
+
 export function ChecklistPage() {
   const intl = useIntl()
-  const { items, addItem, updateItem, deleteItem, toggleItem, resetChecks } = useAppState()
+  const { items, addItem, updateItem, deleteItem, toggleItem, resetChecks, lastResetAt } =
+    useAppState()
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add')
   const [activeItem, setActiveItem] = useState<ChecklistItem | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<ChecklistItem | null>(null)
   const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null)
   const [menuItem, setMenuItem] = useState<ChecklistItem | null>(null)
+  const [relativeNow, setRelativeNow] = useState(() => Date.now())
 
   const pendingCount = useMemo(() => items.filter((item) => !item.checked).length, [items])
   const checkedCount = items.length - pendingCount
   const hasCheckedItems = checkedCount > 0
+  const lastResetCopy = useMemo(
+    () => (lastResetAt ? getRelativeResetCopy(lastResetAt, relativeNow) : null),
+    [lastResetAt, relativeNow],
+  )
+  const lastResetText = useMemo(() => {
+    if (!lastResetCopy) {
+      return null
+    }
+
+    const value =
+      'count' in lastResetCopy
+        ? intl.formatMessage({ id: lastResetCopy.id }, { count: lastResetCopy.count })
+        : intl.formatMessage({ id: lastResetCopy.id })
+
+    return intl.formatMessage({ id: 'checklist.lastResetLabel' }, { value })
+  }, [intl, lastResetCopy])
+
+  useEffect(() => {
+    if (!lastResetAt) {
+      return
+    }
+
+    const timerId = window.setInterval(() => {
+      setRelativeNow(Date.now())
+    }, 60_000)
+
+    return () => window.clearInterval(timerId)
+  }, [lastResetAt])
 
   const closeMenu = () => {
     setMenuAnchorEl(null)
@@ -164,6 +230,11 @@ export function ChecklistPage() {
         >
           <FormattedMessage id="checklist.reset" />
         </Button>
+        {lastResetText ? (
+          <Typography variant="caption" color="text.secondary" textAlign="center">
+            {lastResetText}
+          </Typography>
+        ) : null}
       </Stack>
 
       <ChecklistItemDialog
@@ -237,7 +308,7 @@ export function ChecklistPage() {
               return
             }
 
-            deleteItem(menuItem.id)
+            setDeleteTarget(menuItem)
             closeMenu()
           }}
         >
@@ -247,6 +318,44 @@ export function ChecklistPage() {
           <FormattedMessage id="checklist.delete" />
         </MenuItem>
       </Menu>
+
+      <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>
+          <FormattedMessage id="checklist.deleteTitle" />
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary">
+            {deleteTarget ? (
+              <FormattedMessage
+                id="checklist.deleteDescription"
+                values={{ item: deleteTarget.text }}
+              />
+            ) : null}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 0 }}>
+          <Stack spacing={1} sx={{ width: '100%' }}>
+            <Button
+              variant="contained"
+              color="error"
+              fullWidth
+              onClick={() => {
+                if (!deleteTarget) {
+                  return
+                }
+
+                deleteItem(deleteTarget.id)
+                setDeleteTarget(null)
+              }}
+            >
+              <FormattedMessage id="checklist.confirmDelete" />
+            </Button>
+            <Button fullWidth onClick={() => setDeleteTarget(null)}>
+              <FormattedMessage id="common.cancel" />
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Dialog>
     </Stack>
   )
 }

@@ -21,6 +21,7 @@ import type { ChangeEvent } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { Link as RouterLink } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
+import { PageSection } from '../components/PageSection'
 import { useAppState } from '../context/AppStateContext'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { parsePersistedState, serializePersistedState } from '../lib/storage'
@@ -29,7 +30,7 @@ import type { Language, ThemeMode } from '../types'
 
 export function SettingsPage() {
   const intl = useIntl()
-  const { items, settings, replaceState, setLanguage, setThemeMode } = useAppState()
+  const { items, settings, lastResetAt, replaceState, setLanguage, setThemeMode } = useAppState()
   const { canInstall, promptInstall } = useInstallPrompt()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [importState, setImportState] = useState<PersistedState | null>(null)
@@ -41,6 +42,7 @@ export function SettingsPage() {
       version: 1,
       items,
       settings,
+      lastResetAt,
     }
     const blob = new Blob([serializePersistedState(state)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -50,7 +52,9 @@ export function SettingsPage() {
     link.href = url
     link.download = `checkbefore-backup-${date}.json`
     link.click()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 0)
   }
 
   const handleImportChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -60,7 +64,18 @@ export function SettingsPage() {
       return
     }
 
-    const content = await file.text()
+    let content: string
+
+    try {
+      content = await file.text()
+    } catch {
+      setImportState(null)
+      setImportFileName(null)
+      setRestoreStatus('error')
+      event.target.value = ''
+      return
+    }
+
     const parsed = parsePersistedState(content)
 
     if (parsed.status === 'error') {
@@ -83,122 +98,109 @@ export function SettingsPage() {
         title={intl.formatMessage({ id: 'settings.title' })}
         titleVariant="h5"
         showBack
+        fallbackTo="/"
       />
 
-      <Stack
-        divider={<Divider flexItem />}
-        sx={{
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 3,
-          overflow: 'hidden',
-          backgroundColor: 'background.paper',
-        }}
-      >
-        <Stack spacing={2} sx={{ p: 2.5 }}>
-          <TextField
-            fullWidth
-            select
-            variant="standard"
-            label={intl.formatMessage({ id: 'settings.language' })}
-            value={settings.language}
-            onChange={(event) => setLanguage(event.target.value as Language)}
-          >
-            <MenuItem value="en">{intl.formatMessage({ id: 'language.en' })}</MenuItem>
-            <MenuItem value="es">{intl.formatMessage({ id: 'language.es' })}</MenuItem>
-            <MenuItem value="ja">{intl.formatMessage({ id: 'language.ja' })}</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            select
-            variant="standard"
-            label={intl.formatMessage({ id: 'settings.theme' })}
-            value={settings.themeMode}
-            onChange={(event) => setThemeMode(event.target.value as ThemeMode)}
-          >
-            <MenuItem value="system">{intl.formatMessage({ id: 'theme.system' })}</MenuItem>
-            <MenuItem value="light">{intl.formatMessage({ id: 'theme.light' })}</MenuItem>
-            <MenuItem value="dark">{intl.formatMessage({ id: 'theme.dark' })}</MenuItem>
-          </TextField>
-        </Stack>
+      <PageSection>
+        <Stack divider={<Divider flexItem />}>
+          <Stack spacing={2} sx={{ p: 2.5 }}>
+            <TextField
+              fullWidth
+              select
+              variant="standard"
+              label={intl.formatMessage({ id: 'settings.language' })}
+              value={settings.language}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+            >
+              <MenuItem value="en">{intl.formatMessage({ id: 'language.en' })}</MenuItem>
+              <MenuItem value="es">{intl.formatMessage({ id: 'language.es' })}</MenuItem>
+              <MenuItem value="ja">{intl.formatMessage({ id: 'language.ja' })}</MenuItem>
+            </TextField>
+            <TextField
+              fullWidth
+              select
+              variant="standard"
+              label={intl.formatMessage({ id: 'settings.theme' })}
+              value={settings.themeMode}
+              onChange={(event) => setThemeMode(event.target.value as ThemeMode)}
+            >
+              <MenuItem value="system">{intl.formatMessage({ id: 'theme.system' })}</MenuItem>
+              <MenuItem value="light">{intl.formatMessage({ id: 'theme.light' })}</MenuItem>
+              <MenuItem value="dark">{intl.formatMessage({ id: 'theme.dark' })}</MenuItem>
+            </TextField>
+          </Stack>
 
-        <Stack spacing={1.5} sx={{ p: 2.5 }}>
+          <Stack spacing={1.5} sx={{ p: 2.5 }}>
+            <Typography fontWeight={600}>
+              <FormattedMessage id="settings.reorderTitle" />
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              <FormattedMessage id="settings.reorderDescription" />
+            </Typography>
+            <Button
+              component={RouterLink}
+              to="/reorder"
+              variant="text"
+              startIcon={<FormatListNumberedRoundedIcon />}
+              sx={{ alignSelf: 'flex-start', px: 0 }}
+            >
+              <FormattedMessage id="settings.reorderButton" />
+            </Button>
+          </Stack>
+
+          <Stack spacing={1.5} sx={{ p: 2.5 }}>
+            <Typography fontWeight={600}>
+              <FormattedMessage id="settings.installTitle" />
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              <FormattedMessage id="settings.installDescription" />
+            </Typography>
+            <Button
+              variant="text"
+              disabled={!canInstall}
+              startIcon={<DownloadRoundedIcon />}
+              sx={{ alignSelf: 'flex-start', px: 0 }}
+              onClick={() => {
+                void promptInstall()
+              }}
+            >
+              <FormattedMessage
+                id={canInstall ? 'settings.installButton' : 'settings.installUnavailable'}
+              />
+            </Button>
+          </Stack>
+
+          <Stack spacing={1.5} sx={{ p: 2.5 }}>
+            <Typography fontWeight={600}>
+              <FormattedMessage id="settings.legalTitle" />
+            </Typography>
+            <Button
+              component={RouterLink}
+              to="/terms"
+              variant="text"
+              startIcon={<GavelRoundedIcon />}
+              sx={{ justifyContent: 'flex-start', px: 0 }}
+            >
+              <FormattedMessage id="settings.terms" />
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/privacy"
+              variant="text"
+              startIcon={<PrivacyTipRoundedIcon />}
+              sx={{ justifyContent: 'flex-start', px: 0 }}
+            >
+              <FormattedMessage id="settings.privacy" />
+            </Button>
+          </Stack>
+        </Stack>
+      </PageSection>
+
+      <PageSection tone="subtle">
+        <Stack spacing={2}>
           <Typography fontWeight={600}>
-            <FormattedMessage id="settings.reorderTitle" />
+            <FormattedMessage id="settings.backupTitle" />
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            <FormattedMessage id="settings.reorderDescription" />
-          </Typography>
-          <Button
-            component={RouterLink}
-            to="/reorder"
-            variant="text"
-            startIcon={<FormatListNumberedRoundedIcon />}
-            sx={{ alignSelf: 'flex-start', px: 0 }}
-          >
-            <FormattedMessage id="settings.reorderButton" />
-          </Button>
-        </Stack>
-
-        <Stack spacing={1.5} sx={{ p: 2.5 }}>
-          <Typography fontWeight={600}>
-            <FormattedMessage id="settings.installTitle" />
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            <FormattedMessage id="settings.installDescription" />
-          </Typography>
-          <Button
-            variant="text"
-            disabled={!canInstall}
-            startIcon={<DownloadRoundedIcon />}
-            sx={{ alignSelf: 'flex-start', px: 0 }}
-            onClick={() => {
-              void promptInstall()
-            }}
-          >
-            <FormattedMessage
-              id={canInstall ? 'settings.installButton' : 'settings.installUnavailable'}
-            />
-          </Button>
-        </Stack>
-
-        <Stack spacing={1.5} sx={{ p: 2.5 }}>
-          <Typography fontWeight={600}>
-            <FormattedMessage id="settings.legalTitle" />
-          </Typography>
-          <Button
-            component={RouterLink}
-            to="/terms"
-            variant="text"
-            startIcon={<GavelRoundedIcon />}
-            sx={{ justifyContent: 'flex-start', px: 0 }}
-          >
-            <FormattedMessage id="settings.terms" />
-          </Button>
-          <Button
-            component={RouterLink}
-            to="/privacy"
-            variant="text"
-            startIcon={<PrivacyTipRoundedIcon />}
-            sx={{ justifyContent: 'flex-start', px: 0 }}
-          >
-            <FormattedMessage id="settings.privacy" />
-          </Button>
-        </Stack>
-      </Stack>
-
-      <Stack
-        spacing={2}
-        sx={{
-          p: 2.5,
-          border: '1px dashed',
-          borderColor: 'divider',
-          borderRadius: 3,
-        }}
-      >
-        <Typography fontWeight={600}>
-          <FormattedMessage id="settings.backupTitle" />
-        </Typography>
         <Typography variant="body2" color="text.secondary">
           <FormattedMessage id="settings.backupDescription" />
         </Typography>
@@ -234,7 +236,8 @@ export function SettingsPage() {
             void handleImportChange(event)
           }}
         />
-      </Stack>
+        </Stack>
+      </PageSection>
 
       <Dialog open={importState !== null} onClose={() => setImportState(null)}>
         <DialogTitle>

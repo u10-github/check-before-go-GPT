@@ -19,4 +19,5 @@ export interface PersistedState {
   version: 1
   items: ChecklistItem[]
   settings: AppSettings
+  lastResetAt: string | null
 }

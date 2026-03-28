@@ -78,6 +78,14 @@ describe('CheckBefore app', () => {
 
     await user.click(screen.getByLabelText('Open actions for Wallet and keys'))
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    expect(await screen.findByText('Delete this item?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByText('Wallet and keys')).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Open actions for Wallet and keys'))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete item' }))
+
     await waitFor(() => {
       expect(screen.queryByText('Wallet and keys')).not.toBeInTheDocument()
     })
@@ -100,6 +108,7 @@ describe('CheckBefore app', () => {
     await user.click(screen.getByRole('button', { name: 'Reset all' }))
     await user.click(screen.getByRole('button', { name: 'Reset everything' }))
     expect(await screen.findByText('Pending')).toBeInTheDocument()
+    expect(screen.getByText('Last reset: just now')).toBeInTheDocument()
   })
 
   it('restores persisted items and saved language/theme settings', async () => {
@@ -159,6 +168,59 @@ describe('CheckBefore app', () => {
     expect(screen.getByRole('heading', { name: '設定' })).toBeInTheDocument()
   })
 
+  it('falls back to the checklist page when settings is opened directly and back is pressed', async () => {
+    window.location.hash = '#/settings'
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(await screen.findByRole('heading', { name: "Today's checklist" })).toBeInTheDocument()
+  })
+
+  it('shows the actual checked state on the reorder page', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'wallet',
+            text: 'Wallet',
+            checked: true,
+            order: 0,
+            createdAt: '2026-03-27T00:00:00.000Z',
+            updatedAt: '2026-03-27T00:00:00.000Z',
+          },
+          {
+            id: 'keys',
+            text: 'Keys',
+            checked: false,
+            order: 1,
+            createdAt: '2026-03-27T00:00:00.000Z',
+            updatedAt: '2026-03-27T00:00:00.000Z',
+          },
+        ],
+        settings: {
+          language: 'en',
+          themeMode: 'system',
+        },
+      }),
+    )
+    window.location.hash = '#/reorder'
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Reorder items' })).toBeInTheDocument()
+    expect(screen.getByText('Wallet')).toBeInTheDocument()
+    expect(screen.getByText('Keys')).toBeInTheDocument()
+    expect(screen.getByText('Checked')).toBeInTheDocument()
+    expect(screen.getByText('Pending')).toBeInTheDocument()
+  })
+
   it('restores a backup after confirmation', async () => {
     window.localStorage.setItem(
       STORAGE_KEY,
@@ -194,6 +256,7 @@ describe('CheckBefore app', () => {
           language: 'ja',
           themeMode: 'dark',
         },
+        lastResetAt: '2026-03-27T00:00:00.000Z',
       }),
     )
 
@@ -205,6 +268,7 @@ describe('CheckBefore app', () => {
       expect(persisted.settings.language).toBe('ja')
       expect(persisted.settings.themeMode).toBe('dark')
       expect(persisted.items[0].text).toBe('Wallet')
+      expect(persisted.lastResetAt).toBe('2026-03-27T00:00:00.000Z')
     })
 
     expect(await screen.findByText('バックアップを復元しました。')).toBeInTheDocument()
@@ -229,6 +293,7 @@ describe('CheckBefore app', () => {
           language: 'en',
           themeMode: 'dark',
         },
+        lastResetAt: '2026-03-27T05:30:00.000Z',
       }),
     )
 
@@ -264,13 +329,32 @@ describe('CheckBefore app', () => {
     expect(createObjectURLSpy).toHaveBeenCalledTimes(1)
     expect(anchorClick).toHaveBeenCalledTimes(1)
     expect(downloadName).toMatch(/^checkbefore-backup-\d{4}-\d{2}-\d{2}\.json$/)
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:backup')
+    await waitFor(() => {
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:backup')
+    })
 
     const exportedBlob = createObjectURLSpy.mock.calls[0][0] as Blob
     const exportedState = JSON.parse(await exportedBlob.text())
     expect(exportedState.settings.themeMode).toBe('dark')
     expect(exportedState.items[0].text).toBe('Wallet')
     expect(exportedState.items[0].checked).toBe(true)
+    expect(exportedState.lastResetAt).toBe('2026-03-27T05:30:00.000Z')
+  })
+
+  it('shows an error when the selected backup file cannot be read', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByLabelText('Settings'))
+    const unreadableFile = new File(['{}'], 'broken.json', { type: 'application/json' })
+    Object.defineProperty(unreadableFile, 'text', {
+      configurable: true,
+      value: vi.fn().mockRejectedValue(new Error('read failed')),
+    })
+
+    await user.upload(screen.getByLabelText('Select backup file'), unreadableFile)
+
+    expect(await screen.findByText('The selected file is not a valid CheckBefore backup.')).toBeInTheDocument()
   })
 
   it('keeps the current state when backup restore is canceled', async () => {

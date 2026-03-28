@@ -18,6 +18,7 @@ describe('storage helpers', () => {
     expect(state.version).toBe(1)
     expect(state.items).toEqual([])
     expect(state.settings.themeMode).toBe('system')
+    expect(state.lastResetAt).toBeNull()
   })
 
   it('saves and loads persisted state', () => {
@@ -37,6 +38,7 @@ describe('storage helpers', () => {
         language: 'en' as const,
         themeMode: 'light' as const,
       },
+      lastResetAt: '2026-03-27T08:00:00.000Z',
     }
 
     savePersistedState(state)
@@ -49,6 +51,57 @@ describe('storage helpers', () => {
     window.localStorage.setItem(STORAGE_KEY, '{bad-json')
 
     expect(loadPersistedState().items).toEqual([])
+  })
+
+  it('falls back when storage reads throw', () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('Storage access denied')
+    })
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(loadPersistedState()).toEqual(createDefaultState())
+    expect(getItemSpy).toHaveBeenCalledTimes(1)
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back when a persisted payload has an unsupported version', () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 2,
+        items: [],
+        settings: {
+          language: 'en',
+          themeMode: 'system',
+        },
+      }),
+    )
+
+    expect(loadPersistedState()).toEqual(createDefaultState())
+  })
+
+  it('normalizes missing lastResetAt from older persisted payloads', () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        items: [],
+        settings: {
+          language: 'en',
+          themeMode: 'system',
+        },
+      }),
+    )
+
+    expect(loadPersistedState()).toEqual({
+      version: 1,
+      items: [],
+      settings: {
+        language: 'en',
+        themeMode: 'system',
+      },
+      lastResetAt: null,
+    })
   })
 
   it('parses a valid backup and normalizes item order', () => {
@@ -77,6 +130,7 @@ describe('storage helpers', () => {
           language: 'ja',
           themeMode: 'dark',
         },
+        lastResetAt: '2026-03-27T08:30:00.000Z',
       }),
     )
 
@@ -106,6 +160,7 @@ describe('storage helpers', () => {
           language: 'ja',
           themeMode: 'dark',
         },
+        lastResetAt: '2026-03-27T08:30:00.000Z',
       },
     })
   })
@@ -141,6 +196,7 @@ describe('storage helpers', () => {
         language: 'en',
         themeMode: 'system',
       },
+      lastResetAt: null,
     })
 
     expect(serialized).toContain('\n')
@@ -151,6 +207,22 @@ describe('storage helpers', () => {
         language: 'en',
         themeMode: 'system',
       },
+      lastResetAt: null,
     })
+  })
+
+  it('does not throw when localStorage persistence fails', () => {
+    const state = createDefaultState()
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Quota exceeded')
+    })
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(() => savePersistedState(state)).not.toThrow()
+    expect(setItemSpy).toHaveBeenCalledTimes(1)
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Failed to persist CheckBefore state.',
+      expect.any(Error),
+    )
   })
 })

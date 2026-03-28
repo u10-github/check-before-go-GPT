@@ -1,14 +1,16 @@
 # TODO
 
-## Current Focus
-
-- [x] Initialize repository documentation baseline.
-- [x] Bootstrap Vite + React + TypeScript project.
-- [x] Implement app foundations and MVP checklist flows.
-- [x] Finalize test coverage, CI, and deployment verification.
-- [x] Add route-level lazy loading after the production build emitted a chunk size warning.
+ ## Current Focus
+ 
+ - [x] Initialize repository documentation baseline.
+ - [x] Bootstrap Vite + React + TypeScript project.
+ - [x] Implement app foundations and MVP checklist flows.
+ - [x] Finalize test coverage, CI, and deployment verification.
+ - [x] Add route-level lazy loading after the production build emitted a chunk size warning.
 - [x] Verify the first live GitHub Pages deployment after switching the repository Pages source to GitHub Actions.
 - [x] Issue #1: shift the UI from a generic checklist app toward a practical forgotten-item checker.
+- [x] Issue #2: finish the UI/UX and persistence hardening pass.
+- [x] Issue #3: show the elapsed time since the last reset beneath the reset action.
 
 ## Pending
 
@@ -35,9 +37,11 @@
 - [x] Stabilized `src/App.test.tsx` by splitting the slow CRUD integration test into smaller responsibilities after it hit the 5-second Vitest timeout.
 - [x] Added JSON backup / restore for the local-only checklist state from the Settings screen, including validation, confirmation, and tests.
 - [x] Reworked the checklist and settings UI for GitHub Issue #1 so the app feels closer to a practical forgotten-item checker than a generic task manager.
+- [x] Issue #2: aligned shared page surfaces, stabilized back navigation with explicit fallbacks, added delete confirmation, and hardened persistence validation/save behavior.
+- [x] Issue #3: persisted `lastResetAt` and added the localized elapsed-time hint below the reset action.
 
-## Work Log
-
+ ## Work Log
+ 
 - Initialized an empty repository into a Vite + React + TypeScript application.
 - Selected `HashRouter` to keep GitHub Pages routing simple and robust.
 - Chose `localStorage` persistence with a versioned single-state payload.
@@ -49,5 +53,11 @@
 - Switched the repository Pages build type to `workflow`, pushed the latest commits, and verified a successful `Deploy to GitHub Pages` run plus live HTML that references `/check-before-go-GPT/assets/...`.
 - Selected backup / restore as the next likely feature candidate, then fixed a newly surfaced Vitest timeout in `src/App.test.tsx` by splitting the slow CRUD flow into smaller tests before moving on.
 - Added export / import controls to the settings screen, validated backup files through `src/lib/storage.ts`, and covered restore success, cancel, and invalid-file behavior with automated tests.
-- Opened GitHub Issue #1 with the reference image and re-scoped the next iteration from a narrow checklist tweak to a broader UI/UX pass covering both the checklist and settings screens.
-- Reworked the checklist rows into confirmation slots, moved edit/delete behind a quieter overflow menu, simplified the settings page structure, and added accessibility plus backup-export regression coverage before the final deploy verification.
+ - Opened GitHub Issue #1 with the reference image and re-scoped the next iteration from a narrow checklist tweak to a broader UI/UX pass covering both the checklist and settings screens.
+ - Reworked the checklist rows into confirmation slots, moved edit/delete behind a quieter overflow menu, simplified the settings page structure, and added accessibility plus backup-export regression coverage before the final deploy verification.
+- Reviewed open GitHub Issues and selected the session scope as `#2 -> #3`, because `TODO.md` had already been cleared while the repository still had two open implementation issues.
+- Re-ran the baseline `npm run lint`, `npm run test`, and `npm run build` before editing; all three passed on the pre-change codebase.
+- Added a shared `PageSection` surface, refreshed the reorder/legal/settings-adjacent screens, fixed `ReorderPage` status labels, and replaced fragile back navigation with explicit fallback routes.
+- Added delete confirmation, unified persisted-state version parsing between boot and backup restore, and wrapped `localStorage.setItem` so quota/storage failures do not crash the app.
+- Extended the persisted state with `lastResetAt`, recorded it on reset, rendered a localized relative-time hint below the reset button, and kept older saved data / backups backward compatible by normalizing missing metadata to `null`.
+- Re-ran `npm run lint`, `npm run test`, and `npm run build` after the final changes; all three passed.

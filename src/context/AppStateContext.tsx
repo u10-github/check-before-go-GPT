@@ -6,6 +6,7 @@ import type { AppSettings, ChecklistItem, Language, PersistedState, ThemeMode } 
 interface AppStateContextValue {
   items: ChecklistItem[]
   settings: AppSettings
+  lastResetAt: string | null
   addItem: (text: string) => void
   updateItem: (id: string, text: string) => void
   deleteItem: (id: string) => void
@@ -39,11 +40,12 @@ function normalizeOrder(items: ChecklistItem[]) {
 }
 
 export function AppStateProvider({ children }: PropsWithChildren) {
-  const [{ items, settings }, setState] = useState<PersistedState>(() => loadPersistedState())
+  const [state, setState] = useState<PersistedState>(() => loadPersistedState())
+  const { items, settings, lastResetAt } = state
 
   useEffect(() => {
-    savePersistedState({ version: 1, items, settings })
-  }, [items, settings])
+    savePersistedState(state)
+  }, [state])
 
   const addItem = useCallback((text: string) => {
     const timestamp = now()
@@ -90,9 +92,12 @@ export function AppStateProvider({ children }: PropsWithChildren) {
   }, [])
 
   const resetChecks = useCallback(() => {
+    const resetAt = now()
+
     setState((current) => ({
       ...current,
-      items: current.items.map((item) => ({ ...item, checked: false, updatedAt: now() })),
+      items: current.items.map((item) => ({ ...item, checked: false, updatedAt: resetAt })),
+      lastResetAt: resetAt,
     }))
   }, [])
 
@@ -149,6 +154,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     () => ({
       items: [...items].sort((left, right) => left.order - right.order),
       settings,
+      lastResetAt,
       addItem,
       updateItem,
       deleteItem,
@@ -163,6 +169,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       addItem,
       deleteItem,
       items,
+      lastResetAt,
       moveItem,
       replaceState,
       resetChecks,

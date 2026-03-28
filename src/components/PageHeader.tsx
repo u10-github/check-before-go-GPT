@@ -10,6 +10,7 @@ interface PageHeaderProps {
   description?: string
   titleVariant?: TypographyProps['variant']
   showBack?: boolean
+  fallbackTo?: string
   showSettings?: boolean
 }
 
@@ -18,10 +19,27 @@ export function PageHeader({
   description,
   titleVariant = 'h4',
   showBack = false,
+  fallbackTo = '/',
   showSettings = false,
 }: PageHeaderProps) {
   const intl = useIntl()
   const navigate = useNavigate()
+  const canNavigateBack =
+    typeof window !== 'undefined' &&
+    typeof window.history.state === 'object' &&
+    window.history.state !== null &&
+    'idx' in window.history.state &&
+    typeof window.history.state.idx === 'number' &&
+    window.history.state.idx > 0
+
+  const handleBackClick = () => {
+    if (canNavigateBack) {
+      navigate(-1)
+      return
+    }
+
+    navigate(fallbackTo, { replace: true })
+  }
 
   return (
     <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
@@ -31,7 +49,7 @@ export function PageHeader({
             <IconButton
               aria-label={intl.formatMessage({ id: 'common.back' })}
               color="primary"
-              onClick={() => navigate(-1)}
+              onClick={handleBackClick}
               sx={{ alignSelf: 'flex-start' }}
             >
               <ArrowBackRoundedIcon />

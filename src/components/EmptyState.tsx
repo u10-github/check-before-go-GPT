@@ -1,5 +1,6 @@
 import ChecklistRoundedIcon from '@mui/icons-material/ChecklistRounded'
-import { Card, CardContent, Stack, Typography } from '@mui/material'
+import { Stack, Typography } from '@mui/material'
+import { PageSection } from './PageSection'
 
 interface EmptyStateProps {
   title: string
@@ -8,16 +9,14 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description }: EmptyStateProps) {
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack spacing={2} alignItems="center" py={4} textAlign="center">
-          <ChecklistRoundedIcon color="primary" sx={{ fontSize: 48 }} />
-          <Typography variant="h6" fontWeight={700}>
-            {title}
-          </Typography>
-          <Typography color="text.secondary">{description}</Typography>
-        </Stack>
-      </CardContent>
-    </Card>
+    <PageSection>
+      <Stack spacing={2} alignItems="center" py={4} px={2.5} textAlign="center">
+        <ChecklistRoundedIcon color="primary" sx={{ fontSize: 48 }} />
+        <Typography variant="h6" fontWeight={700}>
+          {title}
+        </Typography>
+        <Typography color="text.secondary">{description}</Typography>
+      </Stack>
+    </PageSection>
   )
 }

@@ -9,15 +9,18 @@ export type ParsePersistedStateResult =
   | { status: 'success'; state: PersistedState }
   | { status: 'error'; reason: ParsePersistedStateErrorReason }
 
+const CURRENT_STATE_VERSION = 1
+
 const DEFAULT_SETTINGS: AppSettings = {
   language: detectBrowserLanguage(),
   themeMode: 'system',
 }
 
 const DEFAULT_STATE: PersistedState = {
-  version: 1,
+  version: CURRENT_STATE_VERSION,
   items: [],
   settings: DEFAULT_SETTINGS,
+  lastResetAt: null,
 }
 
 function isThemeMode(value: unknown): value is ThemeMode {
@@ -51,22 +54,62 @@ function normalizeItems(items: ChecklistItem[]) {
     .map((item, index) => ({ ...item, order: index }))
 }
 
-function normalizeState(input: { items: ChecklistItem[]; settings: AppSettings }): PersistedState {
+function normalizeState(input: {
+  items: ChecklistItem[]
+  settings: AppSettings
+  lastResetAt?: string | null
+}): PersistedState {
   return {
-    version: 1,
+    version: CURRENT_STATE_VERSION,
     items: normalizeItems(input.items),
     settings: input.settings,
+    lastResetAt: typeof input.lastResetAt === 'string' ? input.lastResetAt : null,
+  }
+}
+
+function isSupportedStateVersion(value: unknown): value is PersistedState['version'] {
+  return value === CURRENT_STATE_VERSION
+}
+
+function parseStateCandidate(candidate: unknown): ParsePersistedStateResult {
+  if (typeof candidate !== 'object' || candidate === null) {
+    return { status: 'error', reason: 'invalid-state' }
+  }
+
+  const parsed = candidate as Partial<PersistedState>
+
+  if (
+    !isSupportedStateVersion(parsed.version) ||
+    !Array.isArray(parsed.items) ||
+    !parsed.items.every(isChecklistItem) ||
+    !isLanguage(parsed.settings?.language) ||
+    !isThemeMode(parsed.settings?.themeMode)
+  ) {
+    return { status: 'error', reason: 'invalid-state' }
+  }
+
+  return {
+    status: 'success',
+    state: normalizeState({
+      items: parsed.items,
+      settings: {
+        language: parsed.settings.language,
+        themeMode: parsed.settings.themeMode,
+      },
+      lastResetAt: parsed.lastResetAt,
+    }),
   }
 }
 
 export function createDefaultState(): PersistedState {
   return {
-    version: 1,
+    version: CURRENT_STATE_VERSION,
     items: [],
     settings: {
       language: detectBrowserLanguage(),
       themeMode: 'system',
     },
+    lastResetAt: null,
   }
 }
 
@@ -75,25 +118,24 @@ export function loadPersistedState(): PersistedState {
     return DEFAULT_STATE
   }
 
-  const raw = window.localStorage.getItem(STORAGE_KEY)
+  let raw: string | null
+
+  try {
+    raw = window.localStorage.getItem(STORAGE_KEY)
+  } catch (error) {
+    console.error('Failed to read CheckBefore state.', error)
+    return createDefaultState()
+  }
 
   if (!raw) {
     return createDefaultState()
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<PersistedState>
+    const parsed = JSON.parse(raw)
+    const result = parseStateCandidate(parsed)
 
-    const items = Array.isArray(parsed.items)
-      ? parsed.items.filter(isChecklistItem)
-      : []
-
-    const settings: AppSettings = {
-      language: isLanguage(parsed.settings?.language) ? parsed.settings.language : detectBrowserLanguage(),
-      themeMode: isThemeMode(parsed.settings?.themeMode) ? parsed.settings.themeMode : 'system',
-    }
-
-    return normalizeState({ items, settings })
+    return result.status === 'success' ? result.state : createDefaultState()
   } catch {
     return createDefaultState()
   }
@@ -101,28 +143,7 @@ export function loadPersistedState(): PersistedState {
 
 export function parsePersistedState(raw: string): ParsePersistedStateResult {
   try {
-    const parsed = JSON.parse(raw) as Partial<PersistedState>
-
-    if (
-      parsed.version !== 1 ||
-      !Array.isArray(parsed.items) ||
-      !parsed.items.every(isChecklistItem) ||
-      !isLanguage(parsed.settings?.language) ||
-      !isThemeMode(parsed.settings?.themeMode)
-    ) {
-      return { status: 'error', reason: 'invalid-state' }
-    }
-
-    return {
-      status: 'success',
-      state: normalizeState({
-        items: parsed.items,
-        settings: {
-          language: parsed.settings.language,
-          themeMode: parsed.settings.themeMode,
-        },
-      }),
-    }
+    return parseStateCandidate(JSON.parse(raw))
   } catch {
     return { status: 'error', reason: 'invalid-json' }
   }
@@ -137,5 +158,9 @@ export function savePersistedState(state: PersistedState) {
     return
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch (error) {
+    console.error('Failed to persist CheckBefore state.', error)
+  }
 }
