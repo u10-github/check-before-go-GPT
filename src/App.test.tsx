@@ -35,6 +35,43 @@ function renderAcceptedApp(overrides: Partial<PersistedState> = {}) {
   return render(<App />)
 }
 
+const originalMatchMedia = window.matchMedia
+
+function mockDisplayMode(standalone = false) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(display-mode: standalone)' ? standalone : false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
+
+function dispatchBeforeInstallPrompt(outcome: 'accepted' | 'dismissed' = 'accepted') {
+  const prompt = vi.fn().mockResolvedValue(undefined)
+  const event = new Event('beforeinstallprompt')
+
+  Object.defineProperty(event, 'prompt', {
+    configurable: true,
+    value: prompt,
+  })
+  Object.defineProperty(event, 'userChoice', {
+    configurable: true,
+    value: Promise.resolve({ outcome, platform: 'web' }),
+  })
+
+  fireEvent(window, event)
+
+  return { prompt }
+}
+
 describe('CheckBefore app', () => {
   beforeEach(() => {
     window.localStorage.clear()
@@ -43,6 +80,16 @@ describe('CheckBefore app', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    if (originalMatchMedia) {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: originalMatchMedia,
+      })
+      return
+    }
+
+    Reflect.deleteProperty(window, 'matchMedia')
   })
 
   it('shows the consent gate on first launch and saves acceptance', async () => {
@@ -225,6 +272,62 @@ describe('CheckBefore app', () => {
     })
 
     expect(screen.getByRole('heading', { name: '設定' })).toBeInTheDocument()
+  })
+
+  it('shows manual install guidance when the browser does not expose an app prompt', async () => {
+    mockDisplayMode(false)
+    window.location.hash = '#/settings'
+
+    renderAcceptedApp()
+
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(
+      screen.getByText('This browser needs a manual install step instead of an in-app prompt.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Open your browser menu and look for "Install app" or "Add to Home Screen" if that option is available on this device.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Install CheckBefore' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the install button available when the browser prompt arrives before settings is opened', async () => {
+    mockDisplayMode(false)
+
+    const user = userEvent.setup()
+    renderAcceptedApp()
+
+    const { prompt } = dispatchBeforeInstallPrompt('dismissed')
+    await user.click(await screen.findByLabelText('Settings'))
+
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    const installButton = await screen.findByRole('button', { name: 'Install CheckBefore' })
+
+    await user.click(installButton)
+
+    expect(prompt).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Install CheckBefore' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('shows the installed state when the app is already running in standalone mode', async () => {
+    mockDisplayMode(true)
+    window.location.hash = '#/settings'
+
+    renderAcceptedApp()
+
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(
+      screen.getByText('CheckBefore is already installed or running like an app on this device.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'CheckBefore is already available from your home screen or app launcher.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Install CheckBefore' })).not.toBeInTheDocument()
   })
 
   it('falls back to the checklist page when settings is opened directly and back is pressed', async () => {

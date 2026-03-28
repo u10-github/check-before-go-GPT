@@ -12,6 +12,7 @@
 - [x] Issue #2: finish the UI/UX and persistence hardening pass.
 - [x] Issue #3: show the elapsed time since the last reset beneath the reset action.
 - [x] Issue #4: add a first-launch consent gate before users enter the normal app flow.
+- [x] Issue #5: align the Settings install guidance with real browser install behavior.
 
 ## Pending
 
@@ -41,6 +42,7 @@
 - [x] Issue #2: aligned shared page surfaces, stabilized back navigation with explicit fallbacks, added delete confirmation, and hardened persistence validation/save behavior.
 - [x] Issue #3: persisted `lastResetAt` and added the localized elapsed-time hint below the reset action.
 - [x] Issue #4: added a blocking first-launch consent flow, persisted versioned consent metadata, kept legal pages reachable before consent, and covered the route/storage behavior with tests.
+- [x] Issue #5: replaced the dead install button state with prompt-aware/manual-installed guidance, preserved the deferred prompt across routes, and added regression coverage.
 
  ## Work Log
  
@@ -68,3 +70,7 @@
 - Added a dedicated `/consent` route plus guarded app routes so checklist/settings/reorder stay blocked until the current legal/storage notice version is accepted, while `/terms` and `/privacy` remain readable beforehand.
 - Extended the persisted app state and backup format with versioned consent metadata, defaulted older payloads to `consent: null`, and preserved the acceptance record across export/restore.
 - Added multilingual consent copy (`ja` / `en` / `es`), adjusted legal-page back navigation for pre-consent viewing, and re-ran `npm run lint`, `npm run test`, and `npm run build` successfully after the change.
+- Reviewed the new single open GitHub issue (#5), confirmed `TODO.md` was otherwise clear, and set the session scope to the Settings install UX rather than a broader PWA rebuild.
+- Re-ran the baseline `npm run lint`, `npm run test`, and `npm run build` before editing Issue #5; all three passed on the pre-change codebase.
+- Replaced the Settings install section's permanently disabled state with explicit prompt/manual/installed messaging and lifted the install-prompt listener to app scope so a deferred prompt is not lost before the user opens Settings.
+- Added localized install guidance copy plus Settings/install regression tests, then re-ran `npm run lint`, `npm run test`, and `npm run build` successfully after the final Issue #5 changes.

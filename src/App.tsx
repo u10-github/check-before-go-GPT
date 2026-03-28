@@ -3,6 +3,7 @@ import { Suspense, lazy, useMemo } from 'react'
 import { IntlProvider } from 'react-intl'
 import { HashRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { AppStateProvider, useAppState } from './context/AppStateContext'
+import { InstallPromptProvider } from './hooks/useInstallPrompt'
 import { AppLayout } from './layout/AppLayout'
 import { getMessages } from './messages'
 import { createAppTheme } from './theme/theme'
@@ -103,7 +104,9 @@ function AppContent() {
 export default function App() {
   return (
     <AppStateProvider>
-      <AppContent />
+      <InstallPromptProvider>
+        <AppContent />
+      </InstallPromptProvider>
     </AppStateProvider>
   )
 }

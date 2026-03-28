@@ -32,7 +32,7 @@ export function SettingsPage() {
   const intl = useIntl()
   const { consent, items, settings, lastResetAt, replaceState, setLanguage, setThemeMode } =
     useAppState()
-  const { canInstall, promptInstall } = useInstallPrompt()
+  const { installState, promptInstall } = useInstallPrompt()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [importState, setImportState] = useState<PersistedState | null>(null)
   const [importFileName, setImportFileName] = useState<string | null>(null)
@@ -155,21 +155,38 @@ export function SettingsPage() {
               <FormattedMessage id="settings.installTitle" />
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              <FormattedMessage id="settings.installDescription" />
-            </Typography>
-            <Button
-              variant="text"
-              disabled={!canInstall}
-              startIcon={<DownloadRoundedIcon />}
-              sx={{ alignSelf: 'flex-start', px: 0 }}
-              onClick={() => {
-                void promptInstall()
-              }}
-            >
               <FormattedMessage
-                id={canInstall ? 'settings.installButton' : 'settings.installUnavailable'}
+                id={
+                  installState === 'installed'
+                    ? 'settings.installInstalledDescription'
+                    : installState === 'prompt'
+                      ? 'settings.installPromptDescription'
+                      : 'settings.installManualDescription'
+                }
               />
-            </Button>
+            </Typography>
+            {installState === 'prompt' ? (
+              <Button
+                variant="text"
+                startIcon={<DownloadRoundedIcon />}
+                sx={{ alignSelf: 'flex-start', px: 0 }}
+                onClick={() => {
+                  void promptInstall()
+                }}
+              >
+                <FormattedMessage id="settings.installButton" />
+              </Button>
+            ) : null}
+            {installState === 'manual' ? (
+              <Alert severity="info" variant="outlined">
+                <FormattedMessage id="settings.installManualHelp" />
+              </Alert>
+            ) : null}
+            {installState === 'installed' ? (
+              <Alert severity="success" variant="outlined">
+                <FormattedMessage id="settings.installInstalled" />
+              </Alert>
+            ) : null}
           </Stack>
 
           <Stack spacing={1.5} sx={{ p: 2.5 }}>
