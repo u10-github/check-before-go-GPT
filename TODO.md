@@ -61,3 +61,4 @@
 - Added delete confirmation, unified persisted-state version parsing between boot and backup restore, and wrapped `localStorage.setItem` so quota/storage failures do not crash the app.
 - Extended the persisted state with `lastResetAt`, recorded it on reset, rendered a localized relative-time hint below the reset button, and kept older saved data / backups backward compatible by normalizing missing metadata to `null`.
 - Re-ran `npm run lint`, `npm run test`, and `npm run build` after the final changes; all three passed.
+- Replaced the SVG-first favicon setup with the bundled `favicon_io.zip` assets, switched the PWA manifest icons to the provided Android Chrome PNGs, and prepared a regression test around the favicon references.
