@@ -15,16 +15,19 @@
 
 - Use `HashRouter` to stay compatible with GitHub Pages static hosting.
 - Supported routes:
+  - `/consent` - first-launch consent gate
   - `/` - checklist
   - `/settings` - settings
   - `/reorder` - reorder flow
   - `/terms` - terms of use
   - `/privacy` - privacy policy
+- `/terms` and `/privacy` remain public so users can read legal documents before accepting the consent gate.
 
 ## State management
 
 - `AppStateContext` owns checklist items and user settings.
-- Mutations are exposed as typed callbacks for add, edit, delete, toggle, reset, reorder, language change, theme change, and full-state replacement during backup restore.
+- It also owns the current consent record used to decide whether protected routes are available.
+- Mutations are exposed as typed callbacks for add, edit, delete, toggle, reset, reorder, language change, theme change, consent acceptance, and full-state replacement during backup restore.
 - Route pages consume the context through `useAppState()`.
 
 ## Persistence strategy
@@ -33,6 +36,7 @@
 - Normalize invalid or missing data back to safe defaults.
 - Reindex item order whenever deletion or reordering changes the list.
 - Backup restore goes through the same storage validation layer before replacing the in-memory state.
+- Missing consent metadata from older payloads normalizes to `null`, which forces the first-launch consent gate until the current version is accepted.
 
 ## i18n strategy
 

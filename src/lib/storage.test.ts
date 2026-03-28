@@ -1,5 +1,7 @@
 import {
+  createAcceptedConsent,
   createDefaultState,
+  hasAcceptedCurrentConsent,
   loadPersistedState,
   parsePersistedState,
   savePersistedState,
@@ -19,6 +21,7 @@ describe('storage helpers', () => {
     expect(state.items).toEqual([])
     expect(state.settings.themeMode).toBe('system')
     expect(state.lastResetAt).toBeNull()
+    expect(state.consent).toBeNull()
   })
 
   it('saves and loads persisted state', () => {
@@ -39,6 +42,7 @@ describe('storage helpers', () => {
         themeMode: 'light' as const,
       },
       lastResetAt: '2026-03-27T08:00:00.000Z',
+      consent: createAcceptedConsent('2026-03-27T08:10:00.000Z'),
     }
 
     savePersistedState(state)
@@ -101,6 +105,7 @@ describe('storage helpers', () => {
         themeMode: 'system',
       },
       lastResetAt: null,
+      consent: null,
     })
   })
 
@@ -131,6 +136,7 @@ describe('storage helpers', () => {
           themeMode: 'dark',
         },
         lastResetAt: '2026-03-27T08:30:00.000Z',
+        consent: createAcceptedConsent('2026-03-27T08:35:00.000Z'),
       }),
     )
 
@@ -161,6 +167,38 @@ describe('storage helpers', () => {
           themeMode: 'dark',
         },
         lastResetAt: '2026-03-27T08:30:00.000Z',
+        consent: createAcceptedConsent('2026-03-27T08:35:00.000Z'),
+      },
+    })
+  })
+
+  it('normalizes malformed consent metadata back to null', () => {
+    expect(
+      parsePersistedState(
+        JSON.stringify({
+          version: 1,
+          items: [],
+          settings: {
+            language: 'en',
+            themeMode: 'system',
+          },
+          consent: {
+            acceptedAt: '2026-03-27T08:35:00.000Z',
+            termsVersion: '2026-03-28',
+          },
+        }),
+      ),
+    ).toEqual({
+      status: 'success',
+      state: {
+        version: 1,
+        items: [],
+        settings: {
+          language: 'en',
+          themeMode: 'system',
+        },
+        lastResetAt: null,
+        consent: null,
       },
     })
   })
@@ -197,6 +235,7 @@ describe('storage helpers', () => {
         themeMode: 'system',
       },
       lastResetAt: null,
+      consent: null,
     })
 
     expect(serialized).toContain('\n')
@@ -208,7 +247,21 @@ describe('storage helpers', () => {
         themeMode: 'system',
       },
       lastResetAt: null,
+      consent: null,
     })
+  })
+
+  it('recognizes whether the current consent version has been accepted', () => {
+    expect(hasAcceptedCurrentConsent(null)).toBe(false)
+    expect(hasAcceptedCurrentConsent(createAcceptedConsent('2026-03-27T08:35:00.000Z'))).toBe(true)
+    expect(
+      hasAcceptedCurrentConsent({
+        acceptedAt: '2026-03-27T08:35:00.000Z',
+        termsVersion: '2026-03-01',
+        privacyPolicyVersion: '2026-03-28',
+        storageNoticeVersion: '2026-03-28',
+      }),
+    ).toBe(false)
   })
 
   it('does not throw when localStorage persistence fails', () => {

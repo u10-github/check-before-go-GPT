@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import App from './App'
-import { STORAGE_KEY } from './lib/storage'
+import { createAcceptedConsent, STORAGE_KEY } from './lib/storage'
+import type { PersistedState } from './types'
 
 async function addItem(user: ReturnType<typeof userEvent.setup>, text: string) {
   await user.click(await screen.findByRole('button', { name: 'Add item' }))
@@ -12,6 +13,26 @@ async function addItem(user: ReturnType<typeof userEvent.setup>, text: string) {
 
 function createBackupFile(state: unknown, name = 'backup.json') {
   return new File([JSON.stringify(state)], name, { type: 'application/json' })
+}
+
+function createPersistedState(overrides: Partial<PersistedState> = {}): PersistedState {
+  return {
+    version: 1,
+    items: [],
+    settings: {
+      language: 'en',
+      themeMode: 'system',
+      ...overrides.settings,
+    },
+    lastResetAt: null,
+    consent: createAcceptedConsent('2026-03-28T00:00:00.000Z'),
+    ...overrides,
+  }
+}
+
+function renderAcceptedApp(overrides: Partial<PersistedState> = {}) {
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(createPersistedState(overrides)))
+  return render(<App />)
 }
 
 describe('CheckBefore app', () => {
@@ -24,9 +45,63 @@ describe('CheckBefore app', () => {
     vi.restoreAllMocks()
   })
 
-  it('adds and toggles items', async () => {
+  it('shows the consent gate on first launch and saves acceptance', async () => {
     const user = userEvent.setup()
     render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: 'Review the app terms before you start' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: "Today's checklist" })).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: /I have reviewed the Terms of Use, Privacy Policy, and local storage notice/i,
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Agree and start' }))
+
+    expect(await screen.findByRole('heading', { name: "Today's checklist" })).toBeInTheDocument()
+
+    const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(persisted.consent).toMatchObject({
+      termsVersion: '2026-03-28',
+      privacyPolicyVersion: '2026-03-28',
+      storageNoticeVersion: '2026-03-28',
+    })
+    expect(persisted.consent.acceptedAt).toEqual(expect.any(String))
+  })
+
+  it('keeps protected routes behind the consent gate until accepted', async () => {
+    window.location.hash = '#/settings'
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: 'Review the app terms before you start' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument()
+  })
+
+  it('keeps legal pages reachable before consent and returns to the consent gate', async () => {
+    window.location.hash = '#/terms'
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Terms of Use' })).toBeInTheDocument()
+    expect(screen.getByText('Last updated: 2026-03-28')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Review the app terms before you start' }),
+    ).toBeInTheDocument()
+  })
+
+  it('adds and toggles items', async () => {
+    const user = userEvent.setup()
+    renderAcceptedApp()
 
     await addItem(user, 'Wallet')
 
@@ -41,29 +116,19 @@ describe('CheckBefore app', () => {
   })
 
   it('edits and deletes existing items', async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        items: [
-          {
-            id: 'wallet',
-            text: 'Wallet',
-            checked: false,
-            order: 0,
-            createdAt: '2026-03-27T00:00:00.000Z',
-            updatedAt: '2026-03-27T00:00:00.000Z',
-          },
-        ],
-        settings: {
-          language: 'en',
-          themeMode: 'system',
-        },
-      }),
-    )
-
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp({
+      items: [
+        {
+          id: 'wallet',
+          text: 'Wallet',
+          checked: false,
+          order: 0,
+          createdAt: '2026-03-27T00:00:00.000Z',
+          updatedAt: '2026-03-27T00:00:00.000Z',
+        },
+      ],
+    })
 
     expect(await screen.findByText('Wallet')).toBeInTheDocument()
 
@@ -93,7 +158,7 @@ describe('CheckBefore app', () => {
 
   it('resets checked items only after confirmation', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp()
 
     await addItem(user, 'Phone')
     await user.click(screen.getByLabelText('Toggle Phone'))
@@ -112,28 +177,22 @@ describe('CheckBefore app', () => {
   })
 
   it('restores persisted items and saved language/theme settings', async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        items: [
-          {
-            id: '1',
-            text: 'Pasaporte',
-            checked: false,
-            order: 0,
-            createdAt: '2026-03-27T00:00:00.000Z',
-            updatedAt: '2026-03-27T00:00:00.000Z',
-          },
-        ],
-        settings: {
-          language: 'es',
-          themeMode: 'dark',
+    renderAcceptedApp({
+      items: [
+        {
+          id: '1',
+          text: 'Pasaporte',
+          checked: false,
+          order: 0,
+          createdAt: '2026-03-27T00:00:00.000Z',
+          updatedAt: '2026-03-27T00:00:00.000Z',
         },
-      }),
-    )
-
-    render(<App />)
+      ],
+      settings: {
+        language: 'es',
+        themeMode: 'dark',
+      },
+    })
 
     expect(await screen.findByRole('heading', { name: 'Lista de hoy' })).toBeInTheDocument()
     expect(screen.getByText('Pasaporte')).toBeInTheDocument()
@@ -145,7 +204,7 @@ describe('CheckBefore app', () => {
 
   it('persists language and theme changes from settings', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp()
 
     await user.click(await screen.findByLabelText('Settings'))
 
@@ -172,7 +231,7 @@ describe('CheckBefore app', () => {
     window.location.hash = '#/settings'
 
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp()
 
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
 
@@ -182,37 +241,28 @@ describe('CheckBefore app', () => {
   })
 
   it('shows the actual checked state on the reorder page', async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        items: [
-          {
-            id: 'wallet',
-            text: 'Wallet',
-            checked: true,
-            order: 0,
-            createdAt: '2026-03-27T00:00:00.000Z',
-            updatedAt: '2026-03-27T00:00:00.000Z',
-          },
-          {
-            id: 'keys',
-            text: 'Keys',
-            checked: false,
-            order: 1,
-            createdAt: '2026-03-27T00:00:00.000Z',
-            updatedAt: '2026-03-27T00:00:00.000Z',
-          },
-        ],
-        settings: {
-          language: 'en',
-          themeMode: 'system',
-        },
-      }),
-    )
     window.location.hash = '#/reorder'
 
-    render(<App />)
+    renderAcceptedApp({
+      items: [
+        {
+          id: 'wallet',
+          text: 'Wallet',
+          checked: true,
+          order: 0,
+          createdAt: '2026-03-27T00:00:00.000Z',
+          updatedAt: '2026-03-27T00:00:00.000Z',
+        },
+        {
+          id: 'keys',
+          text: 'Keys',
+          checked: false,
+          order: 1,
+          createdAt: '2026-03-27T00:00:00.000Z',
+          updatedAt: '2026-03-27T00:00:00.000Z',
+        },
+      ],
+    })
 
     expect(await screen.findByRole('heading', { name: 'Reorder items' })).toBeInTheDocument()
     expect(screen.getByText('Wallet')).toBeInTheDocument()
@@ -222,45 +272,39 @@ describe('CheckBefore app', () => {
   })
 
   it('restores a backup after confirmation', async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        items: [],
-        settings: {
-          language: 'en',
-          themeMode: 'system',
-        },
-      }),
-    )
-
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp()
 
     await user.click(await screen.findByLabelText('Settings'))
     await user.upload(
       screen.getByLabelText('Select backup file'),
-      createBackupFile({
-        version: 1,
-        items: [
-          {
-            id: 'wallet',
-            text: 'Wallet',
-            checked: true,
-            order: 0,
-            createdAt: '2026-03-27T00:00:00.000Z',
-            updatedAt: '2026-03-27T00:00:00.000Z',
+      createBackupFile(
+        createPersistedState({
+          items: [
+            {
+              id: 'wallet',
+              text: 'Wallet',
+              checked: true,
+              order: 0,
+              createdAt: '2026-03-27T00:00:00.000Z',
+              updatedAt: '2026-03-27T00:00:00.000Z',
+            },
+          ],
+          settings: {
+            language: 'ja',
+            themeMode: 'dark',
           },
-        ],
-        settings: {
-          language: 'ja',
-          themeMode: 'dark',
-        },
-        lastResetAt: '2026-03-27T00:00:00.000Z',
-      }),
+          lastResetAt: '2026-03-27T00:00:00.000Z',
+          consent: createAcceptedConsent('2026-03-27T00:10:00.000Z'),
+        }),
+      ),
     )
 
-    expect(await screen.findByText('Importing backup.json will replace your current checklist and settings.')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Importing backup.json will replace your current checklist, settings, and consent record.',
+      ),
+    ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Restore now' }))
 
     await waitFor(() => {
@@ -269,34 +313,44 @@ describe('CheckBefore app', () => {
       expect(persisted.settings.themeMode).toBe('dark')
       expect(persisted.items[0].text).toBe('Wallet')
       expect(persisted.lastResetAt).toBe('2026-03-27T00:00:00.000Z')
+      expect(persisted.consent.acceptedAt).toBe('2026-03-27T00:10:00.000Z')
     })
 
     expect(await screen.findByText('バックアップを復元しました。')).toBeInTheDocument()
   })
 
-  it('exports the current checklist state as a backup file', async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
+  it('returns to the consent gate when a restored backup has no consent record', async () => {
+    const user = userEvent.setup()
+    renderAcceptedApp()
+
+    await user.click(await screen.findByLabelText('Settings'))
+    await user.upload(
+      screen.getByLabelText('Select backup file'),
+      createBackupFile({
         version: 1,
-        items: [
-          {
-            id: 'wallet',
-            text: 'Wallet',
-            checked: true,
-            order: 0,
-            createdAt: '2026-03-27T00:00:00.000Z',
-            updatedAt: '2026-03-27T00:00:00.000Z',
-          },
-        ],
+        items: [],
         settings: {
           language: 'en',
-          themeMode: 'dark',
+          themeMode: 'system',
         },
-        lastResetAt: '2026-03-27T05:30:00.000Z',
+        lastResetAt: null,
+        consent: null,
       }),
     )
 
+    expect(
+      await screen.findByText(
+        'Importing backup.json will replace your current checklist, settings, and consent record.',
+      ),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Restore now' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Review the app terms before you start' }),
+    ).toBeInTheDocument()
+  })
+
+  it('exports the current checklist state as a backup file', async () => {
     const user = userEvent.setup()
     const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup')
     const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
@@ -321,7 +375,24 @@ describe('CheckBefore app', () => {
       return originalCreateElement(tagName)
     }) as typeof document.createElement)
 
-    render(<App />)
+    renderAcceptedApp({
+      items: [
+        {
+          id: 'wallet',
+          text: 'Wallet',
+          checked: true,
+          order: 0,
+          createdAt: '2026-03-27T00:00:00.000Z',
+          updatedAt: '2026-03-27T00:00:00.000Z',
+        },
+      ],
+      settings: {
+        language: 'en',
+        themeMode: 'dark',
+      },
+      lastResetAt: '2026-03-27T05:30:00.000Z',
+      consent: createAcceptedConsent('2026-03-27T05:31:00.000Z'),
+    })
 
     await user.click(await screen.findByLabelText('Settings'))
     await user.click(await screen.findByRole('button', { name: 'Download backup' }))
@@ -339,11 +410,12 @@ describe('CheckBefore app', () => {
     expect(exportedState.items[0].text).toBe('Wallet')
     expect(exportedState.items[0].checked).toBe(true)
     expect(exportedState.lastResetAt).toBe('2026-03-27T05:30:00.000Z')
+    expect(exportedState.consent.acceptedAt).toBe('2026-03-27T05:31:00.000Z')
   })
 
   it('shows an error when the selected backup file cannot be read', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp()
 
     await user.click(await screen.findByLabelText('Settings'))
     const unreadableFile = new File(['{}'], 'broken.json', { type: 'application/json' })
@@ -358,44 +430,40 @@ describe('CheckBefore app', () => {
   })
 
   it('keeps the current state when backup restore is canceled', async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        items: [
-          {
-            id: 'keys',
-            text: 'Keys',
-            checked: false,
-            order: 0,
-            createdAt: '2026-03-27T00:00:00.000Z',
-            updatedAt: '2026-03-27T00:00:00.000Z',
-          },
-        ],
-        settings: {
-          language: 'en',
-          themeMode: 'system',
-        },
-      }),
-    )
-
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp({
+      items: [
+        {
+          id: 'keys',
+          text: 'Keys',
+          checked: false,
+          order: 0,
+          createdAt: '2026-03-27T00:00:00.000Z',
+          updatedAt: '2026-03-27T00:00:00.000Z',
+        },
+      ],
+    })
 
     await user.click(await screen.findByLabelText('Settings'))
     await user.upload(
       screen.getByLabelText('Select backup file'),
-      createBackupFile({
-        version: 1,
-        items: [],
-        settings: {
-          language: 'ja',
-          themeMode: 'dark',
-        },
-      }, 'replacement.json'),
+      createBackupFile(
+        createPersistedState({
+          items: [],
+          settings: {
+            language: 'ja',
+            themeMode: 'dark',
+          },
+        }),
+        'replacement.json',
+      ),
     )
 
-    expect(await screen.findByText('Importing replacement.json will replace your current checklist and settings.')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Importing replacement.json will replace your current checklist, settings, and consent record.',
+      ),
+    ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
@@ -405,7 +473,7 @@ describe('CheckBefore app', () => {
 
   it('rejects invalid backup files without replacing state', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    renderAcceptedApp()
 
     await user.click(await screen.findByLabelText('Settings'))
     await user.upload(

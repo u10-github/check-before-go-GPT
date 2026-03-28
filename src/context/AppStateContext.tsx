@@ -1,12 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { PropsWithChildren } from 'react'
-import { loadPersistedState, savePersistedState } from '../lib/storage'
-import type { AppSettings, ChecklistItem, Language, PersistedState, ThemeMode } from '../types'
+import {
+  createAcceptedConsent,
+  hasAcceptedCurrentConsent,
+  loadPersistedState,
+  savePersistedState,
+} from '../lib/storage'
+import type {
+  AppSettings,
+  ChecklistItem,
+  ConsentState,
+  Language,
+  PersistedState,
+  ThemeMode,
+} from '../types'
 
 interface AppStateContextValue {
   items: ChecklistItem[]
   settings: AppSettings
   lastResetAt: string | null
+  consent: ConsentState | null
+  hasAcceptedCurrentConsent: boolean
   addItem: (text: string) => void
   updateItem: (id: string, text: string) => void
   deleteItem: (id: string) => void
@@ -15,6 +29,7 @@ interface AppStateContextValue {
   moveItem: (id: string, direction: 'up' | 'down') => void
   setLanguage: (language: Language) => void
   setThemeMode: (themeMode: ThemeMode) => void
+  acceptConsent: () => void
   replaceState: (state: PersistedState) => void
 }
 
@@ -41,7 +56,7 @@ function normalizeOrder(items: ChecklistItem[]) {
 
 export function AppStateProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<PersistedState>(() => loadPersistedState())
-  const { items, settings, lastResetAt } = state
+  const { items, settings, lastResetAt, consent } = state
 
   useEffect(() => {
     savePersistedState(state)
@@ -146,6 +161,13 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     }))
   }, [])
 
+  const acceptConsent = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      consent: createAcceptedConsent(now()),
+    }))
+  }, [])
+
   const replaceState = useCallback((state: PersistedState) => {
     setState(state)
   }, [])
@@ -155,6 +177,8 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       items: [...items].sort((left, right) => left.order - right.order),
       settings,
       lastResetAt,
+      consent,
+      hasAcceptedCurrentConsent: hasAcceptedCurrentConsent(consent),
       addItem,
       updateItem,
       deleteItem,
@@ -163,10 +187,13 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       moveItem,
       setLanguage,
       setThemeMode,
+      acceptConsent,
       replaceState,
     }),
     [
       addItem,
+      acceptConsent,
+      consent,
       deleteItem,
       items,
       lastResetAt,

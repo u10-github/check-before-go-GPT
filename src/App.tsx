@@ -1,7 +1,7 @@
 import { Box, CircularProgress, CssBaseline, ThemeProvider, useMediaQuery } from '@mui/material'
 import { Suspense, lazy, useMemo } from 'react'
 import { IntlProvider } from 'react-intl'
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { AppStateProvider, useAppState } from './context/AppStateContext'
 import { AppLayout } from './layout/AppLayout'
 import { getMessages } from './messages'
@@ -27,12 +27,35 @@ const LegalPage = lazy(async () => {
   return { default: module.LegalPage }
 })
 
+const ConsentPage = lazy(async () => {
+  const module = await import('./pages/ConsentPage')
+  return { default: module.ConsentPage }
+})
+
 function RouteLoadingFallback() {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
       <CircularProgress />
     </Box>
   )
+}
+
+function ProtectedRoutes() {
+  const { hasAcceptedCurrentConsent } = useAppState()
+
+  return hasAcceptedCurrentConsent ? <Outlet /> : <Navigate to="/consent" replace />
+}
+
+function ConsentRoute() {
+  const { hasAcceptedCurrentConsent } = useAppState()
+
+  return hasAcceptedCurrentConsent ? <Navigate to="/" replace /> : <ConsentPage />
+}
+
+function UnknownRouteRedirect() {
+  const { hasAcceptedCurrentConsent } = useAppState()
+
+  return <Navigate to={hasAcceptedCurrentConsent ? '/' : '/consent'} replace />
 }
 
 function AppContent() {
@@ -57,13 +80,18 @@ function AppContent() {
           <Suspense fallback={<RouteLoadingFallback />}>
             <Routes>
               <Route element={<AppLayout />}>
-                <Route index element={<ChecklistPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="reorder" element={<ReorderPage />} />
+                <Route path="consent" element={<ConsentRoute />} />
                 <Route path="terms" element={<LegalPage kind="terms" />} />
                 <Route path="privacy" element={<LegalPage kind="privacy" />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
+              <Route element={<ProtectedRoutes />}>
+                <Route element={<AppLayout />}>
+                  <Route index element={<ChecklistPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="reorder" element={<ReorderPage />} />
+                </Route>
+              </Route>
+              <Route path="*" element={<UnknownRouteRedirect />} />
             </Routes>
           </Suspense>
         </HashRouter>

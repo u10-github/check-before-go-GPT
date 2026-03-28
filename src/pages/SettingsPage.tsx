@@ -30,7 +30,8 @@ import type { Language, ThemeMode } from '../types'
 
 export function SettingsPage() {
   const intl = useIntl()
-  const { items, settings, lastResetAt, replaceState, setLanguage, setThemeMode } = useAppState()
+  const { consent, items, settings, lastResetAt, replaceState, setLanguage, setThemeMode } =
+    useAppState()
   const { canInstall, promptInstall } = useInstallPrompt()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [importState, setImportState] = useState<PersistedState | null>(null)
@@ -43,6 +44,7 @@ export function SettingsPage() {
       items,
       settings,
       lastResetAt,
+      consent,
     }
     const blob = new Blob([serializePersistedState(state)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)

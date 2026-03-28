@@ -15,9 +15,17 @@ export interface AppSettings {
   themeMode: ThemeMode
 }
 
+export interface ConsentState {
+  acceptedAt: string
+  termsVersion: string
+  privacyPolicyVersion: string
+  storageNoticeVersion: string
+}
+
 export interface PersistedState {
   version: 1
   items: ChecklistItem[]
   settings: AppSettings
   lastResetAt: string | null
+  consent: ConsentState | null
 }

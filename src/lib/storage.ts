@@ -1,7 +1,18 @@
 import { detectBrowserLanguage } from '../messages'
-import type { AppSettings, ChecklistItem, PersistedState, ThemeMode } from '../types'
+import type {
+  AppSettings,
+  ChecklistItem,
+  ConsentState,
+  PersistedState,
+  ThemeMode,
+} from '../types'
 
 export const STORAGE_KEY = 'checkbefore.state.v1'
+export const CURRENT_CONSENT_VERSION = {
+  termsVersion: '2026-03-28',
+  privacyPolicyVersion: '2026-03-28',
+  storageNoticeVersion: '2026-03-28',
+} as const
 
 type ParsePersistedStateErrorReason = 'invalid-json' | 'invalid-state'
 
@@ -21,6 +32,7 @@ const DEFAULT_STATE: PersistedState = {
   items: [],
   settings: DEFAULT_SETTINGS,
   lastResetAt: null,
+  consent: null,
 }
 
 function isThemeMode(value: unknown): value is ThemeMode {
@@ -48,22 +60,43 @@ function isLanguage(value: unknown): value is AppSettings['language'] {
   return value === 'en' || value === 'es' || value === 'ja'
 }
 
+function isConsentState(value: unknown): value is ConsentState {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+
+  return (
+    typeof candidate.acceptedAt === 'string' &&
+    typeof candidate.termsVersion === 'string' &&
+    typeof candidate.privacyPolicyVersion === 'string' &&
+    typeof candidate.storageNoticeVersion === 'string'
+  )
+}
+
 function normalizeItems(items: ChecklistItem[]) {
   return [...items]
     .sort((left, right) => left.order - right.order)
     .map((item, index) => ({ ...item, order: index }))
 }
 
+function normalizeConsent(consent: ConsentState | null | undefined) {
+  return isConsentState(consent) ? consent : null
+}
+
 function normalizeState(input: {
   items: ChecklistItem[]
   settings: AppSettings
   lastResetAt?: string | null
+  consent?: ConsentState | null
 }): PersistedState {
   return {
     version: CURRENT_STATE_VERSION,
     items: normalizeItems(input.items),
     settings: input.settings,
     lastResetAt: typeof input.lastResetAt === 'string' ? input.lastResetAt : null,
+    consent: normalizeConsent(input.consent),
   }
 }
 
@@ -97,6 +130,7 @@ function parseStateCandidate(candidate: unknown): ParsePersistedStateResult {
         themeMode: parsed.settings.themeMode,
       },
       lastResetAt: parsed.lastResetAt,
+      consent: parsed.consent,
     }),
   }
 }
@@ -110,7 +144,23 @@ export function createDefaultState(): PersistedState {
       themeMode: 'system',
     },
     lastResetAt: null,
+    consent: null,
   }
+}
+
+export function createAcceptedConsent(acceptedAt: string): ConsentState {
+  return {
+    acceptedAt,
+    ...CURRENT_CONSENT_VERSION,
+  }
+}
+
+export function hasAcceptedCurrentConsent(consent: ConsentState | null) {
+  return (
+    consent?.termsVersion === CURRENT_CONSENT_VERSION.termsVersion &&
+    consent.privacyPolicyVersion === CURRENT_CONSENT_VERSION.privacyPolicyVersion &&
+    consent.storageNoticeVersion === CURRENT_CONSENT_VERSION.storageNoticeVersion
+  )
 }
 
 export function loadPersistedState(): PersistedState {

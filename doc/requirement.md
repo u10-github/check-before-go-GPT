@@ -27,6 +27,14 @@ Build a mobile-first web app called **CheckBefore**. The app acts as a single-li
 - Reset must require a confirmation dialog.
 - Canceling the dialog must leave state untouched.
 
+### Initial consent
+
+- On first launch, the app must show a blocking consent screen before the normal checklist flow.
+- Users must be able to open the Terms of Use and Privacy Policy from the consent screen before accepting.
+- The consent screen must describe the actual local storage behavior of the app and must not claim cookie usage when cookies are not used for app persistence.
+- Protected routes such as the checklist, settings, and reorder screens must stay inaccessible until the current consent version is accepted.
+- Consent persistence should keep enough version metadata to support future re-consent when legal/storage notices change.
+
 ### Settings
 
 - Settings screen must support language selection.
@@ -87,6 +95,7 @@ Build a mobile-first web app called **CheckBefore**. The app acts as a single-li
 - The checked state survives reloads.
 - Language and theme settings survive reloads.
 - A user can export and restore the full local state without a backend.
+- A first-launch user must accept the current terms/privacy/storage notice before entering the normal app flow.
 - Reordering is available only through the settings flow.
 - Reset requires confirmation.
 - Terms and privacy pages are reachable.

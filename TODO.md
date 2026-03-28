@@ -11,6 +11,7 @@
 - [x] Issue #1: shift the UI from a generic checklist app toward a practical forgotten-item checker.
 - [x] Issue #2: finish the UI/UX and persistence hardening pass.
 - [x] Issue #3: show the elapsed time since the last reset beneath the reset action.
+- [x] Issue #4: add a first-launch consent gate before users enter the normal app flow.
 
 ## Pending
 
@@ -39,6 +40,7 @@
 - [x] Reworked the checklist and settings UI for GitHub Issue #1 so the app feels closer to a practical forgotten-item checker than a generic task manager.
 - [x] Issue #2: aligned shared page surfaces, stabilized back navigation with explicit fallbacks, added delete confirmation, and hardened persistence validation/save behavior.
 - [x] Issue #3: persisted `lastResetAt` and added the localized elapsed-time hint below the reset action.
+- [x] Issue #4: added a blocking first-launch consent flow, persisted versioned consent metadata, kept legal pages reachable before consent, and covered the route/storage behavior with tests.
 
  ## Work Log
  
@@ -62,3 +64,7 @@
 - Extended the persisted state with `lastResetAt`, recorded it on reset, rendered a localized relative-time hint below the reset button, and kept older saved data / backups backward compatible by normalizing missing metadata to `null`.
 - Re-ran `npm run lint`, `npm run test`, and `npm run build` after the final changes; all three passed.
 - Replaced the SVG-first favicon setup with the bundled `favicon_io.zip` assets, switched the PWA manifest icons to the provided Android Chrome PNGs, and prepared a regression test around the favicon references.
+- Reviewed the single remaining open GitHub issue (#4), confirmed the app uses `localStorage` rather than cookies, and treated the issue as the current session scope because `TODO.md` had no pending implementation work.
+- Added a dedicated `/consent` route plus guarded app routes so checklist/settings/reorder stay blocked until the current legal/storage notice version is accepted, while `/terms` and `/privacy` remain readable beforehand.
+- Extended the persisted app state and backup format with versioned consent metadata, defaulted older payloads to `consent: null`, and preserved the acceptance record across export/restore.
+- Added multilingual consent copy (`ja` / `en` / `es`), adjusted legal-page back navigation for pre-consent viewing, and re-ran `npm run lint`, `npm run test`, and `npm run build` successfully after the change.
